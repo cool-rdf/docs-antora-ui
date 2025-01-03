@@ -7,7 +7,6 @@ const concat = require('gulp-concat')
 const cssnano = require('cssnano')
 const fs = require('fs-extra')
 const imagemin = require('gulp-imagemin')
-const { obj: map } = require('through2')
 const merge = require('merge-stream')
 const ospath = require('path')
 const path = ospath.posix
@@ -16,6 +15,9 @@ const postcssCalc = require('postcss-calc')
 const postcssImport = require('postcss-import')
 const postcssUrl = require('postcss-url')
 const postcssVar = require('postcss-custom-properties')
+const { Transform } = require('stream')
+const map = (transform) => new Transform({ objectMode: true, transform })
+const through = () => map((file, enc, next) => next(null, file))
 const uglify = require('gulp-uglify')
 const vfs = require('vinyl-fs')
 
@@ -30,7 +32,7 @@ module.exports = (src, dest, preview) => () => {
           .reduce((accum, { file: depPath, type }) => (type === 'dependency' ? accum.concat(depPath) : accum), [])
           .map((importedPath) => fs.stat(importedPath).then(({ mtime }) => mtime))
       ).then((mtimes) => {
-        const newestMtime = mtimes.reduce((max, curr) => (!max || curr > max ? curr : max))
+        const newestMtime = mtimes.reduce((max, curr) => (!max || curr > max ? curr : max), file.stat.mtime)
         if (newestMtime > file.stat.mtime) file.stat.mtimeMs = +(file.stat.mtime = newestMtime)
       }),
     postcssUrl([
@@ -42,7 +44,18 @@ module.exports = (src, dest, preview) => () => {
           const basename = ospath.basename(abspath)
           const destpath = ospath.join(dest, 'font', basename)
           if (!fs.pathExistsSync(destpath)) fs.copySync(abspath, destpath)
-          return path.join('..', 'font', basename)
+          return path.join('..', 'font', basename) + asset.search + asset.hash
+        },
+      },
+      {
+        filter: '**/~font-awesome/fonts/*',
+        url: (asset) => {
+          const relpath = asset.pathname.substr(1)
+          const abspath = require.resolve(relpath)
+          const basename = ospath.basename(abspath)
+          const destpath = ospath.join(dest, 'font', basename)
+          if (!fs.pathExistsSync(destpath)) fs.copySync(abspath, destpath)
+          return path.join('..', 'font', basename) + asset.search + asset.hash
         },
       },
     ]),
@@ -75,7 +88,7 @@ module.exports = (src, dest, preview) => () => {
               })
               .bundle((bundleError, bundleBuffer) =>
                 Promise.all(mtimePromises).then((mtimes) => {
-                  const newestMtime = mtimes.reduce((max, curr) => (!max || curr > max ? curr : max))
+                  const newestMtime = mtimes.reduce((max, curr) => (curr > max ? curr : max), file.stat.mtime)
                   if (newestMtime > file.stat.mtime) file.stat.mtimeMs = +(file.stat.mtime = newestMtime)
                   if (bundleBuffer !== undefined) file.contents = bundleBuffer
                   file.path = file.path.slice(0, file.path.length - 10) + '.js'
@@ -92,22 +105,30 @@ module.exports = (src, dest, preview) => () => {
       )
       .pipe(buffer())
       .pipe(uglify()),
+    // NOTE use this statement to bundle a JavaScript library that cannot be browserified, like jQuery
+    //vfs.src(require.resolve('<package-name-or-require-path>'), opts).pipe(concat('js/vendor/<library-name>.js')),
     vfs
-      .src('css/site.css', { ...opts, sourcemaps })
+      .src(['css/site.css', 'css/vendor/*.css'], { ...opts, sourcemaps })
       .pipe(postcss((file) => ({ plugins: postcssPlugins, options: { file } }))),
     vfs.src('font/*.{ttf,woff*(2)}', opts),
-    vfs
-      .src('img/**/*.{gif,ico,jpg,png,svg}', opts)
-      .pipe(
-        imagemin(
+    vfs.src('img/**/*.{gif,ico,jpg,png,svg}', opts).pipe(
+      preview
+        ? through()
+        : imagemin(
           [
             imagemin.gifsicle(),
             imagemin.jpegtran(),
             imagemin.optipng(),
-            imagemin.svgo({ plugins: [{ removeViewBox: false }] }),
+            imagemin.svgo({
+              plugins: [
+                { cleanupIDs: { preservePrefixes: ['icon-', 'view-'] } },
+                { removeViewBox: false },
+                { removeDesc: false },
+              ],
+            }),
           ].reduce((accum, it) => (it ? accum.concat(it) : accum), [])
         )
-      ),
+    ),
     vfs.src('helpers/*.js', opts),
     vfs.src('layouts/*.hbs', opts),
     vfs.src('partials/*.hbs', opts)

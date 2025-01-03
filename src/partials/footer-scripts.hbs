@@ -1,13 +1,5 @@
-<script type="text/javascript">
-  window.antora = window.antora || {}
-  window.antora.basePath = '{{or siteRootPath (or site.url siteRootUrl)}}'
-  window.antora.pagePath = '{{@root.page.url}}'
-</script>
 <script src="{{uiRootPath}}/js/site.js"></script>
-{{#if (eq env.DOCSEARCH_ENGINE 'lunr')}}
-  <script src="{{uiRootPath}}/js/vendor/lunr.js"></script>
-  <script src="{{uiRootPath}}/js/vendor/search.js"></script>
-  <script async src="{{uiRootPath}}/../search-index.js"></script>
-{{/if}}
-<script src="{{uiRootPath}}/js/vendor/highlight.js"></script>
-<script>hljs.initHighlighting()</script>
+<script src="{{uiRootPath}}/js/vendor/lunr.min.js"></script>
+<script src="{{uiRootPath}}/js/vendor/search-ui.js" id="search-script" data-site-root-path="{{siteRootPath}}" data-stylesheet="{{uiRootPath}}/css/search.css"></script>
+<script async src="{{siteRootPath}}/search-index.js"></script>
+<script async src="{{uiRootPath}}/js/vendor/highlight.js"></script>

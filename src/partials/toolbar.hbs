@@ -5,4 +5,9 @@
   {{/with}}
 {{> breadcrumbs}}
 {{> page-versions}}
+  {{#if (and page.fileUri (not env.CI))}}
+  <div class="edit-this-page"><a href="{{page.fileUri}}">Contribute to this page</a></div>
+  {{else if (and page.editUrl (or env.FORCE_SHOW_EDIT_PAGE_LINK (not page.origin.private)))}}
+  <div class="edit-this-page"><a href="{{page.editUrl}}">Contribute to this page</a></div>
+  {{/if}}
 </div>

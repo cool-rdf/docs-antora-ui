@@ -1,0 +1,27 @@
+name: Build UI Bundle Zip File
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-ui-bundle:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Set up Node
+      uses: actions/setup-node@v3
+      with:
+        node-version : '16'
+    - name: Install gulp
+      run: npm install -g gulp-cli
+    - name: Install dependencies
+      run: npm install
+    - name: Build UI bundle
+      run: gulp bundle
+    - name: Upload UI bundle
+      uses: actions/upload-artifact@v3
+      with:
+        name: ui-bundle.zip
+        path: build/
